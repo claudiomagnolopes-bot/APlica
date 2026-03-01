@@ -1,0 +1,7 @@
+node_modules/
+.expo/
+.expo-shared/
+android/
+ios/
+.DS_Store
+npm-debug.log*
