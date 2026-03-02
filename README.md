@@ -1,96 +1,113 @@
-# APlica Manutenção
+# APlica Manutenção — Guia para Iniciantes (passo a passo)
 
-Este app está em **Expo (React Native)**.
+Se você nunca fez app, tudo bem. Siga **exatamente** esta ordem.
 
-## Jeito 1 (mais rápido): testar agora com celular ao lado (sem APK)
+---
 
-1. No notebook, abra a pasta do projeto.
-2. Rode:
+## 1) O que você precisa instalar no notebook
+
+### Windows
+1. Instale o **Node.js LTS**: https://nodejs.org
+2. Instale o **Git**: https://git-scm.com/download/win
+3. Instale o **VS Code**: https://code.visualstudio.com
+
+### Mac
+1. Instale o **Node.js LTS**: https://nodejs.org
+2. Instale o **Git** (ou `xcode-select --install` no Terminal)
+3. Instale o **VS Code**: https://code.visualstudio.com
+
+---
+
+## 2) Onde abrir os códigos
+
+1. Abra o **VS Code**.
+2. Clique em **File > Open Folder**.
+3. Selecione a pasta do projeto `APlica`.
+4. No menu do VS Code, clique em **Terminal > New Terminal**.
+
+> É nesse terminal que você vai colar os comandos.
+
+---
+
+## 3) Como testar no celular (modo mais fácil, sem APK)
+
+1. No celular Android, instale o app **Expo Go** (Play Store).
+2. No terminal do VS Code (na pasta do projeto), rode:
 
 ```bash
 npm install
 npm run start
 ```
 
-3. No celular Android, instale o app **Expo Go** (Play Store).
-4. Conecte notebook e celular na **mesma rede Wi-Fi**.
+3. Aguarde aparecer um **QR code** no terminal.
+4. Deixe celular e notebook na **mesma rede Wi‑Fi**.
 5. Abra o **Expo Go** no celular.
-6. Escaneie o QR code que apareceu no terminal do notebook.
-7. O app abre no celular para teste imediato.
+6. Toque em **Scan QR Code** e escaneie o QR.
+7. O app vai abrir no celular.
 
 ---
 
-## Jeito 2: gerar APK e instalar no celular (passo a passo)
+## 4) Como gerar APK (instalar como app normal)
 
-### 1) Preparar no notebook
-
-No terminal, dentro do projeto:
+No terminal do VS Code, rode na ordem:
 
 ```bash
 npm install
 npx expo login
-```
-
-> Se não tiver conta Expo, crie em: https://expo.dev/signup
-
-### 2) Configurar build Android
-
-```bash
 npx eas build:configure
-```
-
-Quando perguntar plataforma, selecione **Android**.
-
-### 3) Gerar APK
-
-```bash
 npx eas build -p android --profile preview
 ```
 
-Aguarde terminar (leva alguns minutos).
+### O que vai acontecer
+- `expo login`: você entra na sua conta Expo.
+- `eas build:configure`: prepara o projeto para build.
+- `eas build ...`: cria o APK na nuvem.
 
-### 4) Pegar link do APK
-
-Quando finalizar, o terminal vai mostrar um link (algo como `https://expo.dev/artifacts/...apk`).
-
-Você também pode ver em:
-
-- https://expo.dev
-- Entrar no seu projeto
-- Aba **Builds**
-- Abrir o build Android e copiar o link do APK
-
-### 5) Instalar no celular
-
-1. Abra o link do APK no celular (WhatsApp, e-mail ou navegador).
-2. Toque para baixar.
-3. Ao instalar, o Android pode pedir para permitir **instalar apps desconhecidos**.
-4. Permita apenas para o navegador/arquivo usado.
-5. Conclua a instalação.
-
-### 6) Testar
-
-1. Abra o app no celular.
-2. Crie uma tarefa e uma ocorrência.
-3. Teste foto, conclusão, histórico e PDF.
+Quando terminar, ele mostra um **link do APK**.
 
 ---
 
-## Se der erro no build APK
+## 5) Como instalar o APK no celular
 
-Rode estes comandos e tente de novo:
+1. Envie o link para seu celular (WhatsApp, e-mail, etc.).
+2. Abra o link no celular.
+3. Baixe o APK.
+4. Toque para instalar.
+5. Se o Android pedir, permita **instalar apps desconhecidos** para o navegador usado.
+6. App instalado.
+
+---
+
+## 6) Onde colocar novos códigos
+
+- Arquivo principal do app: **`App.js`**
+- Lógica de salvar dados offline: **`src/platform-hooks.js`**
+
+Edite pelo VS Code, salve, e rode `npm run start` para ver no celular.
+
+---
+
+## 7) Erros comuns e solução rápida
+
+Se algo não funcionar, rode:
 
 ```bash
 npx expo doctor
+npm run lint
+```
+
+Se o build APK falhar:
+
+```bash
 npx eas build -p android --profile preview --clear-cache
 ```
 
 ---
 
-## Comandos úteis
+## 8) Comandos que você mais vai usar
 
 ```bash
+npm install
 npm run start
-npm run web
 npm run lint
 ```
