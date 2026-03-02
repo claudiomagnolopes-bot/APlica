@@ -1,10 +1,11 @@
-import React, { useCallback, useContext, useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -16,248 +17,269 @@ import { Picker } from '@react-native-picker/picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useMutation, useQuery } from './src/platform-hooks';
 
 const primaryColor = '#2E86AB';
-const accentColor = '#FF6B35';
+const accentColor = '#F39801';
 const backgroundColor = '#F8FAFC';
 const cardColor = '#FFFFFF';
-const textPrimary = '#1F2937';
-const textSecondary = '#6B7280';
+const textPrimary = '#1E293B';
+const textSecondary = '#64748B';
+const ROOMS_LIST = [
+  '1ºA - Carol Ishida', '1ºB - Renata', '2ºA - Juliana', '2ºB - Cristiane', '3ºA - Kamila', '3ºB - Márcia',
+  '4ºA - Susimar', '4ºB - Sonia', '5ºA - Flávia', '5ºB - Carol Muzy', 'Cozinha', 'Coordenação', 'Direção',
+  'Vice Direção', 'Secretaria', 'Limpeza', 'Educação Física', 'A.D.E - Leny, Elizangêla',
+];
 
-const priorityColors = {
-  Vermelho: '#EF4444',
-  Amarelo: '#F59E0B',
-  Verde: '#10B981',
-  Azul: '#3B82F6',
-};
-
-const priorityValues = {
-  Vermelho: 1,
-  Amarelo: 2,
-  Verde: 3,
-  Azul: 4,
-};
+const priorityColors = { high: '#EF4444', medium: '#F59E0B', low: '#10B981', veryLow: '#3B82F6' };
+const priorityLabel = { high: 'Alta', medium: 'Média', low: 'Baixa', veryLow: 'Muito Baixa' };
 
 const Tab = createBottomTabNavigator();
 const ThemeContext = React.createContext();
 
 function ThemeProvider({ children }) {
   const [darkMode] = useState(false);
+  const lightTheme = useMemo(() => ({
+    colors: {
+      primary: primaryColor,
+      accent: accentColor,
+      background: backgroundColor,
+      card: cardColor,
+      textPrimary,
+      textSecondary,
+      border: '#E2E8F0',
+      success: '#10B981',
+      error: '#EF4444',
+      warning: '#F59E0B',
+    },
+  }), []);
 
-  const lightTheme = useMemo(
-    () => ({
-      colors: {
-        primary: primaryColor,
-        accent: accentColor,
-        background: backgroundColor,
-        card: cardColor,
-        textPrimary,
-        textSecondary,
-        border: '#E5E7EB',
-        success: '#10B981',
-      },
-    }),
-    []
-  );
-
-  const theme = darkMode ? lightTheme : lightTheme;
-  const value = useMemo(() => ({ theme, darkMode }), [theme, darkMode]);
-
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme: lightTheme, darkMode }}>{children}</ThemeContext.Provider>;
 }
 
 const useTheme = () => useContext(ThemeContext);
 
-function useHomeScreenState() {
+function HomeScreen() {
   const { theme } = useTheme();
   const { data: tasks, loading, refetch } = useQuery('tasks', { status: 'Pendente' }, { column: 'created_at', ascending: false });
   const { mutate: insertTask } = useMutation('tasks', 'insert');
   const { mutate: updateTask } = useMutation('tasks', 'update');
-
   const [showAddModal, setShowAddModal] = useState(false);
-  const [formData, setFormData] = useState({
-    location: '',
-    description: '',
-    priority: 'Vermelho',
-  });
+  const [formData, setFormData] = useState({ location: '', description: '', priority: 'high' });
 
-  const sortedTasks = useMemo(() => {
-    if (!tasks) return [];
-    return [...tasks].sort((a, b) => priorityValues[a.priority] - priorityValues[b.priority]);
-  }, [tasks]);
+  const sortedTasks = useMemo(() => [...(tasks || [])].sort((a, b) => {
+    const order = { high: 0, medium: 1, low: 2, veryLow: 3 };
+    return order[a.priority] - order[b.priority];
+  }), [tasks]);
 
-  return { theme, tasks: sortedTasks, loading, refetch, insertTask, updateTask, showAddModal, setShowAddModal, formData, setFormData };
-}
-
-const homeHandlers = {
-  openAddModal(state) {
-    state.setFormData({ location: '', description: '', priority: 'Vermelho' });
-    state.setShowAddModal(true);
-  },
-  closeAddModal(state) {
-    state.setShowAddModal(false);
-  },
-  updateFormData(state, field, value) {
-    state.setFormData((prev) => ({ ...prev, [field]: value }));
-  },
-  async addTask(state) {
-    if (!state.formData.location.trim() || !state.formData.description.trim()) {
+  const addTask = async () => {
+    if (!formData.location || !formData.description.trim()) {
       Alert.alert('Erro', 'Preencha todos os campos obrigatórios');
       return;
     }
+    await insertTask({ ...formData, status: 'Pendente', created_at: new Date().toISOString(), completed_at: null });
+    await refetch();
+    setFormData({ location: '', description: '', priority: 'high' });
+    setShowAddModal(false);
+  };
 
-    await state.insertTask({
-      location: state.formData.location.trim(),
-      description: state.formData.description.trim(),
-      priority: state.formData.priority,
-      status: 'Pendente',
-      created_at: new Date().toISOString(),
-      completed_at: null,
-    });
-
-    await state.refetch();
-    state.setShowAddModal(false);
-    state.setFormData({ location: '', description: '', priority: 'Vermelho' });
-    Alert.alert('Sucesso', 'Tarefa adicionada com sucesso!');
-  },
-  completeTask(state, taskId) {
-    Alert.alert('Confirmar', 'Confirma a conclusão desta tarefa?', [
+  const completeTask = (taskId) => {
+    Alert.alert('Confirmar', 'Concluir tarefa?', [
       { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Confirmar',
-        onPress: async () => {
-          await state.updateTask({ id: taskId, data: { status: 'Concluído', completed_at: new Date().toISOString() } });
-          await state.refetch();
-          Alert.alert('Sucesso', 'Tarefa concluída!');
-        },
-      },
+      { text: 'Concluir', onPress: async () => {
+        await updateTask({ id: taskId, data: { status: 'Concluído', completed_at: new Date().toISOString() } });
+        await refetch();
+      } },
     ]);
-  },
-};
+  };
 
-function AddTaskModal({ state, handlers }) {
-  const currentDate = new Date();
+  if (loading) return <View style={styles.center}><Text>Carregando tarefas...</Text></View>;
 
   return (
-    <Modal visible={state.showAddModal} animationType="slide" transparent onRequestClose={() => handlers.closeAddModal(state)}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalBody, { backgroundColor: state.theme.colors.card }]}>
-            <ScrollView>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: state.theme.colors.textPrimary }]}>Nova Tarefa</Text>
-                <TouchableOpacity onPress={() => handlers.closeAddModal(state)}>
-                  <MaterialIcons name="close" size={24} color={state.theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.screenTitle, { color: theme.colors.textPrimary }]}>Tarefas</Text>
+        <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.colors.primary }]} onPress={() => setShowAddModal(true)}>
+          <MaterialIcons name="add" size={20} color="#fff" /><Text style={styles.addButtonText}>Nova</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
+        {sortedTasks.length === 0 ? <Text style={{ color: theme.colors.textSecondary }}>Nenhuma tarefa ativa</Text> : sortedTasks.map((task) => (
+          <View key={task.id} style={[styles.card, { borderColor: theme.colors.border, borderLeftColor: priorityColors[task.priority], borderLeftWidth: 4 }]}>
+            <Text style={styles.title}>{task.location}</Text>
+            <Text style={{ color: theme.colors.textSecondary, marginBottom: 8 }}>{task.description}</Text>
+            <View style={styles.rowBetween}>
+              <Text style={{ color: priorityColors[task.priority], fontWeight: '700' }}>{priorityLabel[task.priority]}</Text>
+              <TouchableOpacity style={[styles.completeButton, { backgroundColor: theme.colors.success }]} onPress={() => completeTask(task.id)}>
+                <MaterialIcons name="check" color="#fff" size={18} />
+                <Text style={{ color: '#fff', marginLeft: 5 }}>Concluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
 
-              <Text style={[styles.label, { color: state.theme.colors.textPrimary }]}>Local *</Text>
-              <View style={[styles.input, { borderColor: state.theme.colors.border }]}>
-                <Picker selectedValue={state.formData.location} onValueChange={(value) => handlers.updateFormData(state, 'location', value)}>
-                  <Picker.Item label="Selecione um local..." value="" />
-                  <Picker.Item label="1ºA - Carol Ishida" value="1ºA - Carol Ishida" />
-                  <Picker.Item label="1ºB - Renata" value="1ºB - Renata" />
-                  <Picker.Item label="2ºA - Juliana" value="2ºA - Juliana" />
-                  <Picker.Item label="2ºB - Cristiane" value="2ºB - Cristiane" />
-                  <Picker.Item label="3ºA - Kamila" value="3ºA - Kamila" />
-                  <Picker.Item label="3ºB - Márcia" value="3ºB - Márcia" />
-                  <Picker.Item label="4ºA - Susimar" value="4ºA - Susimar" />
-                  <Picker.Item label="4ºB - Sonia" value="4ºB - Sonia" />
-                  <Picker.Item label="5ºA - Flávia" value="5ºA - Flávia" />
-                  <Picker.Item label="5ºB - Carol Muzy" value="5ºB - Carol Muzy" />
-                  <Picker.Item label="Educação Física - Tiago" value="Educação Física - Tiago" />
-                </Picker>
-              </View>
-
-              <Text style={[styles.label, { color: state.theme.colors.textPrimary }]}>Descrição *</Text>
-              <TextInput
-                style={[styles.textArea, { borderColor: state.theme.colors.border, color: state.theme.colors.textPrimary }]}
-                placeholder="Descreva o problema..."
-                value={state.formData.description}
-                onChangeText={(text) => handlers.updateFormData(state, 'description', text)}
-                multiline
-              />
-
-              <Text style={[styles.label, { color: state.theme.colors.textPrimary }]}>Prioridade</Text>
-              {['Vermelho', 'Amarelo', 'Verde', 'Azul'].map((priority) => (
-                <TouchableOpacity
-                  key={priority}
-                  style={[
-                    styles.priorityButton,
-                    {
-                      backgroundColor: state.formData.priority === priority ? priorityColors[priority] : state.theme.colors.background,
-                      borderColor: priorityColors[priority],
-                    },
-                  ]}
-                  onPress={() => handlers.updateFormData(state, 'priority', priority)}
-                >
-                  <Text style={{ color: state.formData.priority === priority ? '#fff' : state.theme.colors.textPrimary }}>{priority}</Text>
+      <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => setShowAddModal(false)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[styles.modalBody, { backgroundColor: theme.colors.card }]}>
+            <Text style={styles.modalTitle}>Nova Tarefa</Text>
+            <Text style={styles.label}>Local *</Text>
+            <View style={styles.input}><Picker selectedValue={formData.location} onValueChange={(value) => setFormData((p) => ({ ...p, location: value }))}>
+              <Picker.Item label="Selecione..." value="" />
+              {ROOMS_LIST.map((room) => <Picker.Item key={room} label={room} value={room} />)}
+            </Picker></View>
+            <Text style={styles.label}>Descrição *</Text>
+            <TextInput style={styles.textArea} value={formData.description} onChangeText={(description) => setFormData((p) => ({ ...p, description }))} multiline />
+            <Text style={styles.label}>Prioridade</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {Object.keys(priorityLabel).map((k) => (
+                <TouchableOpacity key={k} style={[styles.pill, { borderColor: priorityColors[k], backgroundColor: formData.priority === k ? priorityColors[k] : '#fff' }]} onPress={() => setFormData((p) => ({ ...p, priority: k }))}>
+                  <Text style={{ color: formData.priority === k ? '#fff' : priorityColors[k] }}>{priorityLabel[k]}</Text>
                 </TouchableOpacity>
               ))}
-
-              <Text style={[styles.dateInfo, { color: state.theme.colors.textSecondary }]}>Data: {currentDate.toLocaleString('pt-BR')}</Text>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => handlers.closeAddModal(state)}>
-                  <Text>Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, { backgroundColor: state.theme.colors.primary }]} onPress={() => handlers.addTask(state)}>
-                  <Text style={{ color: '#fff' }}>Salvar</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setShowAddModal(false)}><Text>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.button, { backgroundColor: theme.colors.primary }]} onPress={addTask}><Text style={{ color: '#fff' }}>Salvar</Text></TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
   );
 }
 
-function HomeScreen() {
-  const state = useHomeScreenState();
+function IncidentsScreen() {
+  const { theme } = useTheme();
+  const { data: incidents, loading, refetch } = useQuery('incidents', {}, { column: 'createdAt', ascending: false });
+  const { mutate: insertIncident } = useMutation('incidents', 'insert');
+  const { mutate: deleteIncident } = useMutation('incidents', 'delete');
 
-  if (state.loading) {
-    return (
-      <View style={[styles.center, { backgroundColor: state.theme.colors.background }]}>
-        <Text>Carregando tarefas...</Text>
-      </View>
-    );
-  }
+  const [showModal, setShowModal] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState('');
+  const [selectedForward, setSelectedForward] = useState('');
+  const [description, setDescription] = useState('');
+
+  const resetForm = () => {
+    setSelectedRoom('');
+    setSelectedForward('');
+    setDescription('');
+  };
+
+  const saveIncident = async () => {
+    if (!selectedRoom || !selectedForward || !description.trim()) {
+      Alert.alert('Erro', 'Preencha todos os campos obrigatórios');
+      return;
+    }
+    await insertIncident({ room: selectedRoom, forwardTo: selectedForward, description: description.trim(), createdAt: new Date().toISOString() });
+    await refetch();
+    resetForm();
+    setShowModal(false);
+  };
+
+  const createIncidentPdf = async (incident) => {
+    const created = new Date(incident.createdAt);
+    const html = `
+      <html><body style="font-family:Arial;padding:24px;">
+      <h1 style="color:#2E86AB;">Ocorrência Escolar</h1>
+      <hr/>
+      <p><strong>Sala/Local:</strong> ${incident.room}</p>
+      <p><strong>Encaminhado para:</strong> ${incident.forwardTo}</p>
+      <p><strong>Descrição:</strong><br/>${incident.description}</p>
+      <p><strong>Data:</strong> ${created.toLocaleDateString('pt-BR')}</p>
+      <p><strong>Hora:</strong> ${created.toLocaleTimeString('pt-BR')}</p>
+      </body></html>
+    `;
+
+    const { uri } = await Print.printToFileAsync({ html });
+    return uri;
+  };
+
+  const handleGenerateAndSharePdf = async (incident) => {
+    try {
+      const pdfUri = await createIncidentPdf(incident);
+      if (Platform.OS === 'web') {
+        Alert.alert('PDF gerado', 'No navegador, use o download da janela de impressão.');
+        return;
+      }
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(pdfUri, { mimeType: 'application/pdf', dialogTitle: 'Enviar ocorrência em PDF' });
+      } else {
+        await Share.share({ message: `PDF salvo em: ${pdfUri}` });
+      }
+    } catch (error) {
+      Alert.alert('Erro', `Não foi possível gerar/enviar o PDF: ${error.message}`);
+    }
+  };
+
+  const handleDelete = (id) => {
+    Alert.alert('Excluir', 'Deseja excluir esta ocorrência?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: async () => {
+        await deleteIncident({ id });
+        await refetch();
+      } },
+    ]);
+  };
+
+  if (loading) return <View style={styles.center}><Text>Carregando ocorrências...</Text></View>;
 
   return (
-    <View style={[styles.container, { backgroundColor: state.theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.screenTitle, { color: state.theme.colors.textPrimary }]}>Tarefas Pendentes</Text>
-        <Text style={{ color: state.theme.colors.textSecondary }}>{state.tasks.length} tarefa(s)</Text>
+        <Text style={[styles.screenTitle, { color: theme.colors.textPrimary }]}>Ocorrências</Text>
+        <TouchableOpacity style={[styles.addButton, { backgroundColor: theme.colors.accent }]} onPress={() => setShowModal(true)}>
+          <MaterialIcons name="add" size={20} color="#fff" /><Text style={styles.addButtonText}>Nova</Text>
+        </TouchableOpacity>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        {state.tasks.length === 0 ? (
-          <View style={styles.center}>
-            <MaterialIcons name="assignment" size={64} color={state.theme.colors.textSecondary} />
-            <Text>Nenhuma tarefa pendente</Text>
-          </View>
-        ) : (
-          state.tasks.map((task) => (
-            <View key={task.id} style={[styles.taskCard, { borderLeftColor: priorityColors[task.priority] }]}>
-              <View style={styles.rowBetween}>
-                <Text>{task.priority}</Text>
-                <TouchableOpacity style={styles.completeButton} onPress={() => homeHandlers.completeTask(state, task.id)}>
-                  <MaterialIcons name="check" color="#fff" size={20} />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.taskLocation}>{task.location}</Text>
-              <Text style={styles.taskDescription}>{task.description}</Text>
+
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
+        {(incidents || []).length === 0 ? <Text style={{ color: theme.colors.textSecondary }}>Nenhuma ocorrência registrada</Text> : incidents.map((incident) => (
+          <View key={incident.id} style={[styles.card, { borderColor: theme.colors.border }]}>
+            <Text style={styles.title}>{incident.room}</Text>
+            <Text style={{ color: theme.colors.textSecondary, marginBottom: 6 }}>{incident.description}</Text>
+            <Text style={{ color: theme.colors.textSecondary, marginBottom: 12 }}>Encaminhado para: {incident.forwardTo}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.warning }]} onPress={() => handleGenerateAndSharePdf(incident)}>
+                <MaterialIcons name="picture-as-pdf" size={18} color="#fff" />
+                <Text style={styles.actionBtnText}>PDF / Enviar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.error }]} onPress={() => handleDelete(incident.id)}>
+                <MaterialIcons name="delete" size={18} color="#fff" />
+                <Text style={styles.actionBtnText}>Excluir</Text>
+              </TouchableOpacity>
             </View>
-          ))
-        )}
+          </View>
+        ))}
       </ScrollView>
 
-      <TouchableOpacity style={[styles.fab, { backgroundColor: state.theme.colors.accent }]} onPress={() => homeHandlers.openAddModal(state)}>
-        <MaterialIcons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
-
-      <AddTaskModal state={state} handlers={homeHandlers} />
+      <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[styles.modalBody, { backgroundColor: theme.colors.card }]}>
+            <Text style={styles.modalTitle}>Nova Ocorrência</Text>
+            <Text style={styles.label}>Sala/Local *</Text>
+            <View style={styles.input}><Picker selectedValue={selectedRoom} onValueChange={setSelectedRoom}>
+              <Picker.Item label="Selecione..." value="" />
+              {ROOMS_LIST.map((room) => <Picker.Item key={room} label={room} value={room} />)}
+            </Picker></View>
+            <Text style={styles.label}>Encaminhar para *</Text>
+            <View style={styles.input}><Picker selectedValue={selectedForward} onValueChange={setSelectedForward}>
+              <Picker.Item label="Selecione..." value="" />
+              {['Direção', 'Vice-direção', 'Coordenação', 'Secretaria', 'Cozinha'].map((target) => <Picker.Item key={target} label={target} value={target} />)}
+            </Picker></View>
+            <Text style={styles.label}>Descrição *</Text>
+            <TextInput style={styles.textArea} value={description} onChangeText={setDescription} multiline placeholder="Descreva a ocorrência" />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setShowModal(false)}><Text>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.button, { backgroundColor: theme.colors.accent }]} onPress={saveIncident}><Text style={{ color: '#fff' }}>Salvar</Text></TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -265,23 +287,17 @@ function HomeScreen() {
 function HistoryScreen() {
   const { theme } = useTheme();
   const { data: completedTasks, loading } = useQuery('tasks', { status: 'Concluído' }, { column: 'completed_at', ascending: false });
-
   if (loading) return <View style={styles.center}><Text>Carregando histórico...</Text></View>;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.screenTitle, { color: theme.colors.textPrimary }]}>Histórico</Text>
-        <Text style={{ color: theme.colors.textSecondary }}>{completedTasks.length} concluída(s)</Text>
-      </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        {completedTasks.map((task) => (
-          <View key={task.id} style={[styles.taskCard, { borderLeftColor: priorityColors[task.priority] }]}>
-            <Text style={styles.taskLocation}>{task.location}</Text>
-            <Text style={styles.taskDescription}>{task.description}</Text>
-            <Text style={{ color: theme.colors.textSecondary }}>
-              Concluída em {new Date(task.completed_at).toLocaleString('pt-BR')}
-            </Text>
+      <View style={styles.header}><Text style={[styles.screenTitle, { color: theme.colors.textPrimary }]}>Histórico</Text></View>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 110 }}>
+        {(completedTasks || []).map((task) => (
+          <View key={task.id} style={[styles.card, { borderColor: theme.colors.border, borderLeftColor: priorityColors[task.priority], borderLeftWidth: 4 }]}>
+            <Text style={styles.title}>{task.location}</Text>
+            <Text>{task.description}</Text>
+            <Text style={{ color: theme.colors.textSecondary }}>Concluída em {new Date(task.completed_at).toLocaleString('pt-BR')}</Text>
           </View>
         ))}
       </ScrollView>
@@ -291,25 +307,16 @@ function HistoryScreen() {
 
 function TabNavigator() {
   const { theme } = useTheme();
-
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { height: 70, paddingBottom: 8, backgroundColor: theme.colors.card },
-        tabBarActiveTintColor: theme.colors.primary,
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ title: 'Tarefas', tabBarIcon: ({ color }) => <MaterialIcons name="assignment" size={22} color={color} /> }}
-      />
-      <Tab.Screen
-        name="History"
-        component={HistoryScreen}
-        options={{ title: 'Histórico', tabBarIcon: ({ color }) => <MaterialIcons name="history" size={22} color={color} /> }}
-      />
+    <Tab.Navigator screenOptions={{
+      headerShown: false,
+      tabBarStyle: { height: 72, paddingBottom: 8, backgroundColor: theme.colors.card },
+      tabBarActiveTintColor: theme.colors.primary,
+      tabBarInactiveTintColor: theme.colors.textSecondary,
+    }}>
+      <Tab.Screen name="Tarefas" component={HomeScreen} options={{ tabBarIcon: ({ color }) => <MaterialIcons name="assignment" size={22} color={color} /> }} />
+      <Tab.Screen name="Ocorrências" component={IncidentsScreen} options={{ tabBarIcon: ({ color }) => <MaterialIcons name="report" size={22} color={color} /> }} />
+      <Tab.Screen name="Histórico" component={HistoryScreen} options={{ tabBarIcon: ({ color }) => <MaterialIcons name="history" size={22} color={color} /> }} />
     </Tab.Navigator>
   );
 }
@@ -329,33 +336,25 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  header: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   screenTitle: { fontSize: 24, fontWeight: 'bold' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  taskCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderLeftWidth: 4,
-  },
+  addButton: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center' },
+  addButtonText: { color: '#fff', fontWeight: '700', marginLeft: 5 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1 },
+  title: { fontSize: 17, fontWeight: '700', marginBottom: 6 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  taskLocation: { fontSize: 18, fontWeight: '700', marginVertical: 6 },
-  taskDescription: { fontSize: 16, marginBottom: 8 },
-  completeButton: { backgroundColor: '#10B981', borderRadius: 18, width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  fab: { position: 'absolute', right: 24, bottom: 24, width: 58, height: 58, borderRadius: 29, justifyContent: 'center', alignItems: 'center' },
+  completeButton: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center' },
   modalOverlay: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
-  modalBody: { margin: 16, borderRadius: 16, padding: 18, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14, alignItems: 'center' },
-  modalTitle: { fontSize: 22, fontWeight: '700' },
+  modalBody: { margin: 16, borderRadius: 16, padding: 16, maxHeight: '92%' },
+  modalTitle: { fontSize: 22, fontWeight: '700', marginBottom: 10 },
   label: { fontSize: 15, fontWeight: '600', marginTop: 10, marginBottom: 6 },
-  input: { borderWidth: 1, borderRadius: 10 },
-  textArea: { borderWidth: 1, borderRadius: 10, minHeight: 100, padding: 12, textAlignVertical: 'top' },
-  priorityButton: { borderWidth: 2, borderRadius: 10, padding: 10, marginBottom: 8, alignItems: 'center' },
-  dateInfo: { marginTop: 8 },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  button: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
+  input: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, overflow: 'hidden' },
+  textArea: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, minHeight: 100, padding: 12, textAlignVertical: 'top' },
+  pill: { borderWidth: 2, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  modalActions: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  button: { flex: 1, borderRadius: 10, alignItems: 'center', paddingVertical: 12 },
   cancelButton: { borderWidth: 1, borderColor: '#d1d5db' },
+  actionBtn: { flex: 1, borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  actionBtnText: { color: '#fff', fontSize: 12, fontWeight: '700', marginLeft: 4 },
 });

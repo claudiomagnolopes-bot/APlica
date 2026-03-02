@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DB_KEY = 'aplica.tasks';
 const listeners = new Set();
 
-async function readTasks() {
-  const raw = await AsyncStorage.getItem(DB_KEY);
+const keyFor = (table) => `aplica.${table}`;
+
+async function readTable(table) {
+  const raw = await AsyncStorage.getItem(keyFor(table));
   if (!raw) return [];
   try {
     return JSON.parse(raw);
@@ -14,8 +15,8 @@ async function readTasks() {
   }
 }
 
-async function writeTasks(tasks) {
-  await AsyncStorage.setItem(DB_KEY, JSON.stringify(tasks));
+async function writeTable(table, items) {
+  await AsyncStorage.setItem(keyFor(table), JSON.stringify(items));
 }
 
 function notify() {
@@ -28,11 +29,11 @@ export function useQuery(table, filters = {}, orderBy) {
 
   const refetch = useCallback(async () => {
     setLoading(true);
-    const tasks = await readTasks();
-    let filtered = tasks;
+    const items = await readTable(table);
+    let filtered = items;
 
-    if (table === 'tasks' && filters?.status) {
-      filtered = tasks.filter((item) => item.status === filters.status);
+    if (filters?.status) {
+      filtered = filtered.filter((item) => item.status === filters.status);
     }
 
     if (orderBy?.column) {
@@ -61,25 +62,32 @@ export function useQuery(table, filters = {}, orderBy) {
 export function useMutation(table, type) {
   const mutate = useCallback(
     async (payload) => {
-      if (table !== 'tasks') throw new Error('Tabela não suportada');
-      const tasks = await readTasks();
+      const items = await readTable(table);
 
       if (type === 'insert') {
         const item = {
           ...payload,
           id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         };
-        await writeTasks([item, ...tasks]);
+        await writeTable(table, [item, ...items]);
         notify();
         return item;
       }
 
       if (type === 'update') {
         const { id, data } = payload;
-        const nextTasks = tasks.map((task) => (task.id === id ? { ...task, ...data } : task));
-        await writeTasks(nextTasks);
+        const nextItems = items.map((item) => (item.id === id ? { ...item, ...data } : item));
+        await writeTable(table, nextItems);
         notify();
         return { id, data };
+      }
+
+      if (type === 'delete') {
+        const { id } = payload;
+        const nextItems = items.filter((item) => item.id !== id);
+        await writeTable(table, nextItems);
+        notify();
+        return { id };
       }
 
       throw new Error('Mutação não suportada');

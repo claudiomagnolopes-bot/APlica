@@ -75,3 +75,12 @@ npm run lint     # valida código
 - `App.js`: interface principal + navegação por abas.
 - `src/platform-hooks.js`: hooks `useQuery` e `useMutation` para persistência local.
 - `app.json`: configuração do app Expo.
+
+## PDF de Ocorrências
+
+Na aba **Ocorrências**, cada item agora tem o botão **PDF / Enviar**:
+
+1. Gera um PDF com os dados da ocorrência
+2. Abre o compartilhamento nativo para enviar (WhatsApp, e-mail etc.)
+
+No Android, isso usa `expo-print` + `expo-sharing`.
