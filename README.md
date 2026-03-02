@@ -1,65 +1,96 @@
 # APlica Manutenção
 
-Este app está em **Expo (React Native)**. A forma mais simples de instalar no smartphone é via **Expo Go**.
+Este app está em **Expo (React Native)**.
 
-## Instalar no smartphone (jeito mais fácil)
+## Jeito 1 (mais rápido): testar agora com celular ao lado (sem APK)
 
-### Android
-
-1. No celular, instale o app **Expo Go** (Play Store).
-2. No computador, dentro da pasta do projeto, rode:
+1. No notebook, abra a pasta do projeto.
+2. Rode:
 
 ```bash
 npm install
 npm run start
 ```
 
-3. Vai aparecer um QR code no terminal.
-4. Abra o **Expo Go** no celular e toque em **Scan QR Code**.
-5. Escaneie o QR code.
-6. Pronto: o APlica abre no seu smartphone.
-
-> Importante: celular e computador precisam estar na **mesma rede Wi‑Fi**.
-
-### iPhone (se precisar)
-
-1. Instale **Expo Go** na App Store.
-2. Rode `npm run start` no computador.
-3. Abra a câmera do iPhone e escaneie o QR code (ou abra pelo Expo Go).
+3. No celular Android, instale o app **Expo Go** (Play Store).
+4. Conecte notebook e celular na **mesma rede Wi-Fi**.
+5. Abra o **Expo Go** no celular.
+6. Escaneie o QR code que apareceu no terminal do notebook.
+7. O app abre no celular para teste imediato.
 
 ---
 
-## Quero instalar sem Expo Go (APK)
+## Jeito 2: gerar APK e instalar no celular (passo a passo)
 
-Se você quiser instalar como app “normal” no Android:
+### 1) Preparar no notebook
+
+No terminal, dentro do projeto:
 
 ```bash
 npm install
 npx expo login
+```
+
+> Se não tiver conta Expo, crie em: https://expo.dev/signup
+
+### 2) Configurar build Android
+
+```bash
 npx eas build:configure
+```
+
+Quando perguntar plataforma, selecione **Android**.
+
+### 3) Gerar APK
+
+```bash
 npx eas build -p android --profile preview
 ```
 
-No final, o Expo gera um link para baixar o **APK** e instalar no celular.
+Aguarde terminar (leva alguns minutos).
+
+### 4) Pegar link do APK
+
+Quando finalizar, o terminal vai mostrar um link (algo como `https://expo.dev/artifacts/...apk`).
+
+Você também pode ver em:
+
+- https://expo.dev
+- Entrar no seu projeto
+- Aba **Builds**
+- Abrir o build Android e copiar o link do APK
+
+### 5) Instalar no celular
+
+1. Abra o link do APK no celular (WhatsApp, e-mail ou navegador).
+2. Toque para baixar.
+3. Ao instalar, o Android pode pedir para permitir **instalar apps desconhecidos**.
+4. Permita apenas para o navegador/arquivo usado.
+5. Conclua a instalação.
+
+### 6) Testar
+
+1. Abra o app no celular.
+2. Crie uma tarefa e uma ocorrência.
+3. Teste foto, conclusão, histórico e PDF.
 
 ---
 
-## Scripts úteis
+## Se der erro no build APK
+
+Rode estes comandos e tente de novo:
 
 ```bash
-npm run start    # inicia o projeto e mostra QR code
-npm run android  # roda ambiente Android nativo (dev)
-npm run web      # versão web
-npm run lint     # valida código
+npx expo doctor
+npx eas build -p android --profile preview --clear-cache
 ```
 
 ---
 
-## Funcionalidade de PDF
+## Comandos úteis
 
-Na aba **Ocorrências**, cada ocorrência tem botão **PDF / Enviar**:
-
-1. Gera PDF da ocorrência
-2. Abre compartilhamento do celular (WhatsApp, e-mail, etc.)
-
-Implementação usando `expo-print` + `expo-sharing`.
+```bash
+npm run start
+npm run web
+npm run lint
+```
