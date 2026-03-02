@@ -1,86 +1,65 @@
-# APlica Manutenção (Android)
+# APlica Manutenção
 
-Sim — este projeto já está pronto como app React Native com Expo.
+Este app está em **Expo (React Native)**. A forma mais simples de instalar no smartphone é via **Expo Go**.
 
-## 1) Preparar ambiente (uma vez só)
+## Instalar no smartphone (jeito mais fácil)
 
-- Instale **Node.js 18+**
-- Instale o app **Expo Go** no celular Android
-- (Opcional para APK/AAB de loja) crie conta no Expo: https://expo.dev
+### Android
 
-## 2) Rodar no celular (jeito mais rápido)
+1. No celular, instale o app **Expo Go** (Play Store).
+2. No computador, dentro da pasta do projeto, rode:
 
 ```bash
 npm install
 npm run start
 ```
 
-Depois que abrir o Metro/Expo no terminal:
+3. Vai aparecer um QR code no terminal.
+4. Abra o **Expo Go** no celular e toque em **Scan QR Code**.
+5. Escaneie o QR code.
+6. Pronto: o APlica abre no seu smartphone.
 
-1. Conecte celular e computador na mesma rede Wi‑Fi
-2. Abra o **Expo Go** no Android
-3. Escaneie o QR code mostrado no terminal
+> Importante: celular e computador precisam estar na **mesma rede Wi‑Fi**.
 
-Pronto: o app abre no celular.
+### iPhone (se precisar)
 
-## 3) Gerar APK para instalar no Android
+1. Instale **Expo Go** na App Store.
+2. Rode `npm run start` no computador.
+3. Abra a câmera do iPhone e escaneie o QR code (ou abra pelo Expo Go).
 
-### Opção A — APK de desenvolvimento (local)
+---
 
-> Requer Android Studio + SDK + emulador/dispositivo configurado.
+## Quero instalar sem Expo Go (APK)
 
-```bash
-npm install
-npx expo prebuild --platform android
-cd android
-./gradlew assembleDebug
-```
-
-APK gerado em:
-
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-### Opção B — Build na nuvem (recomendado)
+Se você quiser instalar como app “normal” no Android:
 
 ```bash
 npm install
 npx expo login
-npx expo install eas-cli
 npx eas build:configure
 npx eas build -p android --profile preview
 ```
 
-No final, o Expo retorna um link para baixar o APK/AAB.
+No final, o Expo gera um link para baixar o **APK** e instalar no celular.
 
-## 4) Publicar na Play Store (resumo)
+---
 
-1. Gere **AAB** com EAS (`--profile production`)
-2. Crie app no Google Play Console
-3. Envie o AAB
-4. Preencha ficha da loja e publique
-
-## Scripts disponíveis
+## Scripts úteis
 
 ```bash
-npm run start    # abre Expo/Metro
-npm run android  # roda app no ambiente Android nativo
+npm run start    # inicia o projeto e mostra QR code
+npm run android  # roda ambiente Android nativo (dev)
 npm run web      # versão web
 npm run lint     # valida código
 ```
 
-## Estrutura principal
+---
 
-- `App.js`: interface principal + navegação por abas.
-- `src/platform-hooks.js`: hooks `useQuery` e `useMutation` para persistência local.
-- `app.json`: configuração do app Expo.
+## Funcionalidade de PDF
 
-## PDF de Ocorrências
+Na aba **Ocorrências**, cada ocorrência tem botão **PDF / Enviar**:
 
-Na aba **Ocorrências**, cada item agora tem o botão **PDF / Enviar**:
+1. Gera PDF da ocorrência
+2. Abre compartilhamento do celular (WhatsApp, e-mail, etc.)
 
-1. Gera um PDF com os dados da ocorrência
-2. Abre o compartilhamento nativo para enviar (WhatsApp, e-mail etc.)
-
-No Android, isso usa `expo-print` + `expo-sharing`.
+Implementação usando `expo-print` + `expo-sharing`.
